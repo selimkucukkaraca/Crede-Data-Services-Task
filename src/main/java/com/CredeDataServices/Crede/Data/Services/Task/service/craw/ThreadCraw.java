@@ -1,6 +1,7 @@
 package com.CredeDataServices.Crede.Data.Services.Task.service.craw;
 
 import com.CredeDataServices.Crede.Data.Services.Task.dto.DataDto;
+import com.CredeDataServices.Crede.Data.Services.Task.exception.FileException;
 import com.CredeDataServices.Crede.Data.Services.Task.service.connection.ConnectionService;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,8 +11,9 @@ import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
 
 import java.io.*;
-import java.util.Iterator;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 
 @AllArgsConstructor
 @Setter
@@ -30,13 +32,12 @@ public class ThreadCraw implements Runnable{
             connectionPage = connection.getConnection(this.urlPage, this.index);
             Elements datas = connectionPage.select("div._ngcontent-ikv-c130");
 
-            datas.stream()
-                    .forEach(data ->{DataDto dataDto = DataDto.builder()
-                            .tenderRegistrationNumber(data.selectFirst("span").text())
-                            .qualityTypeAndQuantity(data.selectFirst("span").text())
-                            .placeOfWork(data.selectFirst("span").text())
-                            .tenderType(data.selectFirst("span").text())
-                            .url(data.selectFirst("a").attr("herf"))
+            datas.forEach(data ->{DataDto dataDto = DataDto.builder()
+                            .tenderRegistrationNumber(Objects.requireNonNull(data.selectFirst("span")).text())
+                            .qualityTypeAndQuantity(Objects.requireNonNull(data.selectFirst("span")).text())
+                            .placeOfWork(Objects.requireNonNull(data.selectFirst("span")).text())
+                            .tenderType(Objects.requireNonNull(data.selectFirst("span")).text())
+                            .url(Objects.requireNonNull(data.selectFirst("a")).attr("herf"))
                             .build();
                         this.dataDtoList.add(dataDto);
                     });
@@ -44,33 +45,20 @@ public class ThreadCraw implements Runnable{
             writeFile(dataDtoList);
 
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new FileException(e);
         }
     }
 
     void writeFile(List<DataDto> dataDtoList){
         File path = new File("data.txt");
 
-        try {
-            FileOutputStream fileOutputStream = new FileOutputStream(path);
-            OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream, "UTF-8");
-            BufferedWriter bufferedWriter = new BufferedWriter(outputStreamWriter);
+        try(BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(path, true), StandardCharsets.UTF_8))) {
             bufferedWriter.write("");
 
-            Iterator<DataDto> iterator = dataDtoList.iterator();
-
-            while (iterator.hasNext()){
-                try {
-                    DataDto data = iterator.next();
-                    bufferedWriter.write(data.tenderRegistrationNumber() + "," + data.qualityTypeAndQuantity() + "," + data.placeOfWork() + "," + data.tenderType());
-                    bufferedWriter.newLine();
-                }catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+            for (DataDto data : dataDtoList) {
+                bufferedWriter.write(data.tenderRegistrationNumber() + "," + data.qualityTypeAndQuantity() + "," + data.placeOfWork() + "," + data.tenderType());
+                bufferedWriter.newLine();
             }
-            bufferedWriter.close();
-            outputStreamWriter.close();
-            fileOutputStream.close();
         }catch(Exception ex) {
             ex.printStackTrace();
         }
